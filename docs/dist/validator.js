@@ -181,25 +181,37 @@
           || getGenericError()
     }
 
+    var dfds = [];
+    
     $.each(this.validators, $.proxy(function (key, validator) {
-      var error = null
-      if ((getValue($el) || $el.attr('required')) &&
-          ($el.attr('data-' + key) !== undefined || key == 'native') &&
-          (error = validator.call(this, $el))) {
-         error = getErrorMessage(key) || error
-        !~errors.indexOf(error) && errors.push(error)
-      }
+        var error;
+        if ((getValue($el) || $el.attr('required')) && Validator.VALIDATORS[key] && 
+            ($el.attr('data-' + key) !== undefined || key == 'native') && (error = validator.call(this, $el))) {
+              error = getErrorMessage(key) || error
+            !~errors.indexOf(error) && errors.push(error)
+        }
+        else if ((getValue($el) || $el.attr('required')) && $el.attr('data-' + key) !== undefined) {
+            dfds.push(
+                validator.call(this, $el)
+                    .fail(function (err) { errors.push(error) })
+            );
+        }
     }, this))
 
     if (!errors.length && getValue($el) && $el.attr('data-remote')) {
-      this.defer($el, function () {
-        var data = {}
-        data[$el.attr('name')] = getValue($el)
-        $.get($el.attr('data-remote'), data)
-          .fail(function (jqXHR, textStatus, error) { errors.push(getErrorMessage('remote') || error) })
-          .always(function () { deferred.resolve(errors)})
-      })
-    } else deferred.resolve(errors)
+        this.defer($el, function () {
+            var data = {}
+            data[$el.attr('name')] = getValue($el)
+            $.get($el.attr('data-remote'), data)
+                .fail(function (jqXHR, textStatus, error) { errors.push(getErrorMessage('remote') || error) })
+        })
+    }
+
+    if(!errors.lenght && !dfds.length){
+        $.when.apply($, dfds).done(function(err) {
+            deferred.resolve(errors)
+        });
+    } else deferred.resolve(errors)		
 
     return deferred.promise()
   }
